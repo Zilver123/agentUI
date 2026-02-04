@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(python3:*)",
+      "Bash(/opt/homebrew/bin/python3:*)",
+      "Bash(pip3 show:*)",
+      "Bash(/opt/homebrew/opt/python@3.11/bin/python3.11:*)",
+      "Bash(cd /Users/oliver/Library/Mobile\\\\ Documents/com~apple~CloudDocs/Projects/agent_ui/frontend && npm run dev:*)",
+      "Bash(open http://localhost:3001)",
+      "Bash(curl:*)",
+      "Bash(/opt/homebrew/opt/python@3.11/bin/pip3.11 install:*)",
+      "Bash(pkill:*)"
+    ]
+  }
+}
