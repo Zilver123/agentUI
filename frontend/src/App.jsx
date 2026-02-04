@@ -107,6 +107,8 @@ function App() {
           const lastMsg = newMessages[newMessages.length - 1]
           if (lastMsg && lastMsg.role === 'assistant') {
             lastMsg.tools = [...(lastMsg.tools || []), { id: data.tool_id, name: data.name, status: 'running' }]
+          } else {
+            newMessages.push({ role: 'assistant', content: '', tools: [{ id: data.tool_id, name: data.name, status: 'running' }] })
           }
           return newMessages
         })
