@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Start Agent UI
+# Start AgentUI
 
-echo "Starting Agent UI..."
+echo "Starting AgentUI..."
 
 # Check for API key
 if [ -z "$ANTHROPIC_API_KEY" ]; then
@@ -31,7 +31,7 @@ FRONTEND_PID=$!
 cd ..
 
 echo ""
-echo "Agent UI running!"
+echo "AgentUI running!"
 echo "Frontend: http://localhost:3000"
 echo "Backend:  http://localhost:8000"
 echo ""

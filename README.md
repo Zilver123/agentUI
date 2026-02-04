@@ -1,6 +1,6 @@
-# Agent UI
+# AgentUI
 
-A simple Claude clone with custom tool support using the Claude Agent SDK.
+A simple Claude clone with custom tool support using the Anthropic SDK.
 
 ## Quick Start
 
@@ -33,23 +33,27 @@ Open http://localhost:3000
 Edit `backend/tools.py`:
 
 ```python
-from claude_agent_sdk import tool
-
-@tool("my_tool", "Description of what it does", {
-    "param1": str,
-    "param2": int
-})
-async def my_tool(args):
-    result = do_something(args["param1"], args["param2"])
-    return {
-        "content": [{"type": "text", "text": str(result)}]
+# 1. Add schema to TOOLS_SCHEMA list
+TOOLS_SCHEMA.append({
+    "name": "my_tool",
+    "description": "Description of what it does",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "param1": {"type": "string", "description": "First param"},
+            "param2": {"type": "integer", "description": "Second param"}
+        },
+        "required": ["param1"]
     }
+})
 
-# Add to the list
-ALL_TOOLS = [
-    # ... existing tools
-    my_tool,
-]
+# 2. Add implementation
+async def my_tool_impl(args: dict) -> str:
+    result = do_something(args["param1"], args["param2"])
+    return str(result)
+
+# 3. Register in TOOL_HANDLERS
+TOOL_HANDLERS["my_tool"] = my_tool_impl
 ```
 
 Restart the backend after adding tools.

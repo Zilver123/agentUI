@@ -1,5 +1,5 @@
 """
-Agent UI Backend - FastAPI + WebSocket + Anthropic SDK
+AgentUI Backend - FastAPI + WebSocket + Anthropic SDK
 """
 import json
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -8,7 +8,7 @@ from anthropic import Anthropic
 
 from tools import TOOLS_SCHEMA, execute_tool
 
-app = FastAPI(title="Agent UI")
+app = FastAPI(title="AgentUI")
 
 app.add_middleware(
     CORSMiddleware,
