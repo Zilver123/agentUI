@@ -217,27 +217,21 @@ body {
   margin-left: auto;
 }
 
-/* Thinking indicator */
-.thinking {
-  display: flex;
-  gap: 4px;
+/* Loading indicator */
+.loading-text {
   padding: 8px 0;
+  font-size: 15px;
+  color: var(--text-secondary);
 }
 
-.thinking span {
-  width: 8px;
-  height: 8px;
-  background: var(--text-secondary);
-  border-radius: 50%;
-  animation: bounce 1.4s infinite ease-in-out;
+.loading-dot {
+  animation: blink 1.2s infinite;
+  opacity: 0;
 }
 
-.thinking span:nth-child(1) { animation-delay: -0.32s; }
-.thinking span:nth-child(2) { animation-delay: -0.16s; }
-
-@keyframes bounce {
-  0%, 80%, 100% { transform: scale(0); }
-  40% { transform: scale(1); }
+@keyframes blink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
 }
 
 /* Input area */

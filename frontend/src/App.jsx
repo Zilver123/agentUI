@@ -40,6 +40,7 @@ function App() {
   const [input, setInput] = useState('')
   const [media, setMedia] = useState([])
   const [isThinking, setIsThinking] = useState(false)
+  const [isWaiting, setIsWaiting] = useState(false)
   const [error, setError] = useState(null)
   const [ws, setWs] = useState(null)
   const [activeTools, setActiveTools] = useState({})
@@ -85,6 +86,7 @@ function App() {
         break
 
       case 'text_delta':
+        setIsWaiting(false)
         setMessages(prev => {
           const newMessages = [...prev]
           const lastMsg = newMessages[newMessages.length - 1]
@@ -98,6 +100,7 @@ function App() {
         break
 
       case 'tool_start':
+        setIsWaiting(false)
         setActiveTools(prev => ({
           ...prev,
           [data.tool_id]: { name: data.name, status: 'running' }
@@ -133,11 +136,13 @@ function App() {
 
       case 'done':
         setIsThinking(false)
+        setIsWaiting(false)
         break
 
       case 'error':
         setError(data.message)
         setIsThinking(false)
+        setIsWaiting(false)
         break
 
       case 'cleared':
@@ -211,7 +216,8 @@ function App() {
       }))
     }))
 
-    // Clear input
+    // Show loading and clear input
+    setIsWaiting(true)
     setInput('')
     setMedia([])
   }
@@ -296,13 +302,14 @@ function App() {
           ))
         )}
 
-        {/* Thinking indicator */}
-        {isThinking && messages[messages.length - 1]?.role !== 'assistant' && (
+        {/* Loading indicator */}
+        {isWaiting && (
           <div className="message assistant">
-            <div className="thinking">
-              <span></span>
-              <span></span>
-              <span></span>
+            <div className="loading-text">
+              Loading
+              <span className="loading-dot" style={{ animationDelay: '0s' }}>.</span>
+              <span className="loading-dot" style={{ animationDelay: '0.3s' }}>.</span>
+              <span className="loading-dot" style={{ animationDelay: '0.6s' }}>.</span>
             </div>
           </div>
         )}
