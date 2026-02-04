@@ -1,6 +1,10 @@
 """
-Custom tools for the agent.
-Add your own tools here.
+Sample tools for the agent.
+Copy this file to tools.py and add your own custom tools.
+
+    cp tools_sample.py tools.py
+
+tools.py is gitignored so your custom tools stay private.
 """
 from datetime import datetime
 import ast

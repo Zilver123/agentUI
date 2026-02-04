@@ -2,9 +2,16 @@
 AgentUI Backend - FastAPI + WebSocket + Anthropic SDK
 """
 import json
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from anthropic import Anthropic
+
+# Load .env from project root
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from tools import TOOLS_SCHEMA, execute_tool
 
