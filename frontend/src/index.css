@@ -33,18 +33,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Mobile-first scrollbar */
+/* Hide scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  display: none;
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
+* {
+  scrollbar-width: none;
 }
 
 /* App container */
