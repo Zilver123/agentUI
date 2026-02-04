@@ -16,15 +16,31 @@ if [ -z "$ANTHROPIC_API_KEY" ]; then
     exit 1
 fi
 
-# Create tools.py from sample if it doesn't exist
+# Create tools.py and config.py from samples if they don't exist
 if [ ! -f backend/tools.py ]; then
     echo "Creating backend/tools.py from tools_sample.py..."
     cp backend/tools_sample.py backend/tools.py
 fi
 
+if [ ! -f backend/config.py ]; then
+    echo "Creating backend/config.py from config_sample.py..."
+    cp backend/config_sample.py backend/config.py
+fi
+
+# Check for FAL_KEY (optional, needed for image generation)
+if [ -z "$FAL_KEY" ]; then
+    echo "Warning: FAL_KEY not set. Image generation will not work."
+    echo "Set it in .env: FAL_KEY=your-key"
+fi
+
 # Start backend
 echo "Starting backend..."
 cd backend
+if [ ! -d .venv ]; then
+    echo "Creating Python virtual environment..."
+    python3 -m venv .venv
+fi
+source .venv/bin/activate
 pip install -q -r requirements.txt
 python main.py &
 BACKEND_PID=$!

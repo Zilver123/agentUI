@@ -161,6 +161,31 @@ body {
   padding: 0;
 }
 
+/* Generated images in assistant messages (rendered by ReactMarkdown) */
+.message-content img {
+  max-width: 100%;
+  max-height: 500px;
+  border-radius: 12px;
+  margin: 8px 0;
+  object-fit: contain;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.message-content img:hover {
+  opacity: 0.9;
+}
+
+/* Links in messages */
+.message-content a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.message-content a:hover {
+  text-decoration: underline;
+}
+
 /* Media in messages */
 .message-media {
   display: flex;

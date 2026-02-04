@@ -1,8 +1,9 @@
 # Environment
 .env
 
-# Private tools (use tools_sample.py as template)
+# Private tools and config (use *_sample.py as templates)
 backend/tools.py
+backend/config.py
 
 # Python
 __pycache__/

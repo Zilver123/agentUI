@@ -1,7 +1,12 @@
 """
 AgentUI Backend - FastAPI + WebSocket + Anthropic SDK
 """
+from __future__ import annotations
+
+import asyncio
+import base64
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -14,6 +19,9 @@ from anthropic import Anthropic
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from tools import TOOLS_SCHEMA, execute_tool
+from config import SYSTEM_PROMPT, MODEL, AGENT_NAME
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AgentUI")
 
@@ -27,7 +35,26 @@ app.add_middleware(
 
 client = Anthropic()
 
-MODEL = "claude-sonnet-4-20250514"
+
+async def upload_base64_to_fal(base64_data: str, media_type: str) -> str | None:
+    """Upload a base64 image to Fal CDN and return the public URL."""
+    fal_key = os.environ.get("FAL_KEY")
+    if not fal_key:
+        return None
+
+    import fal_client
+
+    image_bytes = base64.b64decode(base64_data)
+
+    def sync_upload():
+        return fal_client.upload(image_bytes, content_type=media_type)
+
+    try:
+        url = await asyncio.to_thread(sync_upload)
+        return url
+    except Exception as e:
+        logger.warning(f"Fal CDN upload failed: {e}")
+        return None
 
 
 @app.websocket("/ws/{session_id}")
@@ -50,6 +77,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
             # Build content array (text + optional media)
             content = []
+            uploaded_image_urls = []
 
             # Add images first
             for media in data.get("media", []):
@@ -62,11 +90,28 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                             "data": media["data"]
                         }
                     })
+                    # Upload to Fal CDN so tools can reference images by URL
+                    try:
+                        fal_url = await upload_base64_to_fal(
+                            media["data"], media["media_type"]
+                        )
+                        if fal_url:
+                            uploaded_image_urls.append(fal_url)
+                    except Exception as e:
+                        logger.warning(f"Failed to upload image to Fal CDN: {e}")
 
             # Add text
             text = data.get("text", "").strip()
             if text:
                 content.append({"type": "text", "text": text})
+
+            # If images were uploaded, tell Claude the URLs for tool use
+            if uploaded_image_urls:
+                urls_text = ", ".join(uploaded_image_urls)
+                content.append({
+                    "type": "text",
+                    "text": f"[System: The user uploaded images. Available image URLs for use with tools: {urls_text}]"
+                })
 
             if not content:
                 continue
@@ -79,6 +124,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
             try:
                 response_text = ""
+                tool_call_count = 0
+                MAX_TOOL_CALLS = 5
 
                 # Agent loop - keep going while there are tool calls
                 while True:
@@ -86,6 +133,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     with client.messages.stream(
                         model=MODEL,
                         max_tokens=4096,
+                        system=SYSTEM_PROMPT,
                         messages=messages,
                         tools=TOOLS_SCHEMA if TOOLS_SCHEMA else None,
                     ) as stream:
@@ -155,6 +203,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
                         if not tool_uses:
                             # No tool calls - we're done
+                            break
+
+                        # Check tool call limit to prevent infinite retry loops
+                        tool_call_count += len(tool_uses)
+                        if tool_call_count > MAX_TOOL_CALLS:
+                            logger.warning(f"Tool call limit ({MAX_TOOL_CALLS}) reached, stopping agent loop")
                             break
 
                         # Execute tools and add results

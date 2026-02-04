@@ -14,7 +14,19 @@
       "Bash(python main.py:*)",
       "Bash(npm run dev:*)",
       "Bash(tree:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "WebFetch(domain:fal.ai)",
+      "WebFetch(domain:docs.fal.ai)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:fal-ai.github.io)",
+      "WebFetch(domain:www.postman.com)",
+      "Bash(wait:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(bash:*)",
+      "Bash(/opt/homebrew/opt/python@3.13/bin/python3.13:*)",
+      "Bash(source .venv/bin/activate)",
+      "Bash(pip install:*)"
     ]
   }
 }
