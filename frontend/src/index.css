@@ -186,6 +186,14 @@ body {
   text-decoration: underline;
 }
 
+/* Generated videos in assistant messages */
+.message-content video {
+  max-width: 100%;
+  max-height: 400px;
+  border-radius: 12px;
+  margin: 8px 0;
+}
+
 /* Media in messages */
 .message-media {
   display: flex;

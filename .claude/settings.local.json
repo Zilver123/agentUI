@@ -28,7 +28,8 @@
       "Bash(source .venv/bin/activate)",
       "Bash(pip install:*)",
       "Bash(kill:*)",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(python:*)"
     ]
   }
 }

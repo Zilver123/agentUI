@@ -70,6 +70,38 @@ TOOLS_SCHEMA = [
             "required": ["prompt"]
         }
     },
+    {
+        "name": "generate_video",
+        "description": "Generate a video from start and end frame images using AI (Veo 3.1). Takes two image URLs (first frame and last frame) and creates a smooth video transition between them. Use this after generating start/end frame images with generate_image. Returns the URL of the generated video.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "Text describing the video motion/transition between the start and end frames"
+                },
+                "first_frame_url": {
+                    "type": "string",
+                    "description": "URL of the video's opening frame image"
+                },
+                "last_frame_url": {
+                    "type": "string",
+                    "description": "URL of the video's closing frame image"
+                },
+                "aspect_ratio": {
+                    "type": "string",
+                    "enum": ["auto", "landscape", "portrait"],
+                    "description": "Video aspect ratio. 'landscape' = 16:9, 'portrait' = 9:16. Defaults to 'auto'."
+                },
+                "duration": {
+                    "type": "string",
+                    "enum": ["4s", "6s", "8s"],
+                    "description": "Video duration. Defaults to '8s'."
+                }
+            },
+            "required": ["prompt", "first_frame_url", "last_frame_url"]
+        }
+    },
 ]
 
 
@@ -175,11 +207,78 @@ async def generate_image_impl(args: dict) -> str:
         return f"Error generating image: {str(e)}"
 
 
+async def generate_video_impl(args: dict) -> str:
+    """Generate a video from start and end frame images using Fal AI's Veo 3.1."""
+    fal_key = os.environ.get("FAL_KEY")
+    if not fal_key:
+        return "Error: FAL_KEY not configured. Add it to your .env file."
+
+    prompt = args.get("prompt", "")
+    first_frame_url = args.get("first_frame_url", "")
+    last_frame_url = args.get("last_frame_url", "")
+
+    if not first_frame_url or not last_frame_url:
+        return "Error: Both first_frame_url and last_frame_url are required."
+
+    # Map aspect ratio
+    aspect_ratio_map = {
+        "auto": "auto",
+        "landscape": "16:9",
+        "portrait": "9:16",
+    }
+    aspect_ratio = aspect_ratio_map.get(args.get("aspect_ratio", "auto"), "auto")
+    duration = args.get("duration", "8s")
+
+    url = "https://fal.run/fal-ai/veo3.1/fast/first-last-frame-to-video"
+    payload = {
+        "prompt": prompt,
+        "first_frame_url": first_frame_url,
+        "last_frame_url": last_frame_url,
+        "aspect_ratio": aspect_ratio,
+        "duration": duration,
+        "generate_audio": True,
+    }
+
+    headers = {
+        "Authorization": f"Key {fal_key}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        # Video generation takes longer - use 5 minute timeout
+        async with httpx.AsyncClient(timeout=300.0) as http_client:
+            response = await http_client.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+
+        video = data.get("video", {})
+        video_url = video.get("url", "")
+        if not video_url:
+            return "Error: Video URL missing from API response."
+
+        return f"Video generated successfully.\n\nURL: {video_url}"
+
+    except httpx.TimeoutException:
+        return "Error: Video generation timed out (5 min). Try a shorter duration or simpler prompt."
+    except httpx.HTTPStatusError as e:
+        error_detail = ""
+        try:
+            error_detail = e.response.json().get("detail", e.response.text[:200])
+        except Exception:
+            error_detail = e.response.text[:200]
+        logger.error(f"Fal API error: {e.response.status_code} - {error_detail}")
+        return f"Error: Fal API returned status {e.response.status_code}. {error_detail}"
+    except Exception as e:
+        logger.error(f"Video generation error: {e}")
+        return f"Error generating video: {str(e)}"
+
+
 # Tool dispatcher
 TOOL_HANDLERS = {
     "get_current_time": get_current_time_impl,
     "calculator": calculator_impl,
     "generate_image": generate_image_impl,
+    "generate_video": generate_video_impl,
 }
 
 

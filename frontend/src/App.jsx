@@ -292,7 +292,23 @@ function App() {
               {msg.content && (
                 <div className="message-content">
                   {msg.role === 'assistant' ? (
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <ReactMarkdown
+                      components={{
+                        a: ({href, children}) => {
+                          // Auto-render video URLs as video elements
+                          if (href && (href.endsWith('.mp4') || (href.includes('fal.media') && href.includes('video')))) {
+                            return (
+                              <video src={href} controls playsInline>
+                                <a href={href}>{children}</a>
+                              </video>
+                            );
+                          }
+                          return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
+                        }
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
                   ) : (
                     msg.content
                   )}
