@@ -29,7 +29,8 @@
       "Bash(pip install:*)",
       "Bash(kill:*)",
       "Bash(lsof:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(./start.sh:*)"
     ]
   }
 }

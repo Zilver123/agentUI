@@ -190,7 +190,7 @@ async def generate_image_impl(args: dict) -> str:
         if not image_url:
             return "Error: Image URL missing from API response."
 
-        return f"Image generated successfully.\n\nURL: {image_url}"
+        return image_url
 
     except httpx.TimeoutException:
         return "Error: Image generation timed out (120s). Try a simpler prompt or try again."
@@ -256,7 +256,7 @@ async def generate_video_impl(args: dict) -> str:
         if not video_url:
             return "Error: Video URL missing from API response."
 
-        return f"Video generated successfully.\n\nURL: {video_url}"
+        return video_url
 
     except httpx.TimeoutException:
         return "Error: Video generation timed out (5 min). Try a shorter duration or simpler prompt."

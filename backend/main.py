@@ -222,12 +222,17 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                             })
                             await websocket.send_json({
                                 "type": "tool_end",
-                                "tool_id": tool_use.id,
-                                "result": result[:200] if len(result) > 200 else result
+                                "tool_id": tool_use.id
                             })
 
                         # Add tool results to messages
                         messages.append({"role": "user", "content": tool_results})
+
+                        # Signal new turn to frontend so it creates a new message bubble
+                        await websocket.send_json({"type": "new_turn"})
+
+                        # Reset response_text for the new turn
+                        response_text = ""
 
                         # Continue the loop to get Claude's response to tool results
 

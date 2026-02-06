@@ -48,6 +48,7 @@ function App() {
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
+  const pendingNewTurn = useRef(false)
 
   // Connect WebSocket
   useEffect(() => {
@@ -89,9 +90,21 @@ function App() {
         setIsWaiting(false)
         setMessages(prev => {
           const newMessages = [...prev]
+
+          // Check if we need to start a new message (after tool execution)
+          if (pendingNewTurn.current) {
+            pendingNewTurn.current = false
+            newMessages.push({ role: 'assistant', content: data.text, tools: [] })
+            return newMessages
+          }
+
           const lastMsg = newMessages[newMessages.length - 1]
           if (lastMsg && lastMsg.role === 'assistant') {
-            lastMsg.content += data.text
+            // Create new object to ensure React detects the change
+            newMessages[newMessages.length - 1] = {
+              ...lastMsg,
+              content: lastMsg.content + data.text
+            }
           } else {
             newMessages.push({ role: 'assistant', content: data.text, tools: [] })
           }
@@ -132,6 +145,11 @@ function App() {
           }
           return newMessages
         })
+        break
+
+      case 'new_turn':
+        // Flag that next text_delta should start a new message
+        pendingNewTurn.current = true
         break
 
       case 'done':
