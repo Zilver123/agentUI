@@ -1,25 +1,19 @@
 """
 Custom tools for the PopAd.ai marketing agent.
-This file is gitignored - edit freely.
 """
+import ast
 import logging
+import operator
 import os
 from datetime import datetime
-import ast
-import operator
 
 import httpx
 
 logger = logging.getLogger(__name__)
 
-
-# Aspect ratio mapping for Fal AI
-ASPECT_RATIOS = {
-    "square": "1:1",
-    "landscape": "16:9",
-    "portrait": "9:16",
-}
-
+# Aspect ratio mappings for Fal AI
+IMAGE_ASPECT_RATIOS = {"square": "1:1", "landscape": "16:9", "portrait": "9:16"}
+VIDEO_ASPECT_RATIOS = {"auto": "auto", "landscape": "16:9", "portrait": "9:16"}
 
 # Tool schemas for Claude API
 TOOLS_SCHEMA = [
@@ -106,10 +100,10 @@ TOOLS_SCHEMA = [
 
 
 # Tool implementations
-async def get_current_time_impl(args: dict) -> str:
+
+async def get_current_time_impl(_args: dict) -> str:
     """Returns the current date and time."""
-    now = datetime.now()
-    return now.strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 async def calculator_impl(args: dict) -> str:
@@ -122,42 +116,40 @@ async def calculator_impl(args: dict) -> str:
         ast.Pow: operator.pow,
     }
 
-    def eval_expr(node):
-        if isinstance(node, ast.Num):
-            return node.n
-        elif isinstance(node, ast.Constant):
+    def eval_node(node):
+        if isinstance(node, ast.Constant):
             return node.value
-        elif isinstance(node, ast.BinOp):
-            return ops[type(node.op)](eval_expr(node.left), eval_expr(node.right))
-        elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
-            return -eval_expr(node.operand)
-        else:
-            raise ValueError("Unsupported expression")
+        if isinstance(node, ast.Num):  # Python 3.7 compat
+            return node.n
+        if isinstance(node, ast.BinOp):
+            return ops[type(node.op)](eval_node(node.left), eval_node(node.right))
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+            return -eval_node(node.operand)
+        raise ValueError("Unsupported expression")
 
     try:
         tree = ast.parse(args["expression"], mode="eval")
-        result = eval_expr(tree.body)
-        return str(result)
+        return str(eval_node(tree.body))
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"Error: {e}"
 
 
 async def generate_image_impl(args: dict) -> str:
     """Generate or edit an image using Fal AI's nano-banana-pro model."""
     fal_key = os.environ.get("FAL_KEY")
     if not fal_key:
-        return "Error: FAL_KEY not configured. Add it to your .env file."
+        return "Error: FAL_KEY not configured"
 
     prompt = args.get("prompt", "")
     image_urls = args.get("image_urls", [])
-    aspect_ratio = ASPECT_RATIOS.get(args.get("aspect_ratio", "square"), "square")
+    aspect_ratio = IMAGE_ASPECT_RATIOS.get(args.get("aspect_ratio", "square"), "1:1")
 
-    # Choose endpoint based on whether we're editing existing images or generating new
+    # Choose endpoint based on whether we're editing or generating
     if image_urls:
         url = "https://fal.run/fal-ai/nano-banana-pro/edit"
         payload = {
             "prompt": prompt,
-            "image_urls": image_urls[:3],  # Max 3 input images
+            "image_urls": image_urls[:3],
             "num_images": 1,
             "aspect_ratio": aspect_ratio,
             "output_format": "png",
@@ -177,65 +169,46 @@ async def generate_image_impl(args: dict) -> str:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=120.0) as http_client:
-            response = await http_client.post(url, json=payload, headers=headers)
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
 
         images = data.get("images", [])
-        if not images:
-            return "Error: No images returned from the API."
+        if not images or not images[0].get("url"):
+            return "Error: No image URL in response"
 
-        image_url = images[0].get("url", "")
-        if not image_url:
-            return "Error: Image URL missing from API response."
-
-        return image_url
+        return images[0]["url"]
 
     except httpx.TimeoutException:
-        return "Error: Image generation timed out (120s). Try a simpler prompt or try again."
+        return "Error: Image generation timed out (120s)"
     except httpx.HTTPStatusError as e:
-        error_detail = ""
-        try:
-            error_detail = e.response.json().get("detail", e.response.text[:200])
-        except Exception:
-            error_detail = e.response.text[:200]
-        logger.error(f"Fal API error: {e.response.status_code} - {error_detail}")
-        return f"Error: Fal API returned status {e.response.status_code}. {error_detail}"
+        detail = _extract_error_detail(e)
+        logger.error(f"Fal API error: {e.response.status_code} - {detail}")
+        return f"Error: Fal API {e.response.status_code}. {detail}"
     except Exception as e:
         logger.error(f"Image generation error: {e}")
-        return f"Error generating image: {str(e)}"
+        return f"Error: {e}"
 
 
 async def generate_video_impl(args: dict) -> str:
     """Generate a video from start and end frame images using Fal AI's Veo 3.1."""
     fal_key = os.environ.get("FAL_KEY")
     if not fal_key:
-        return "Error: FAL_KEY not configured. Add it to your .env file."
+        return "Error: FAL_KEY not configured"
 
-    prompt = args.get("prompt", "")
-    first_frame_url = args.get("first_frame_url", "")
-    last_frame_url = args.get("last_frame_url", "")
+    first_frame = args.get("first_frame_url", "")
+    last_frame = args.get("last_frame_url", "")
 
-    if not first_frame_url or not last_frame_url:
-        return "Error: Both first_frame_url and last_frame_url are required."
+    if not first_frame or not last_frame:
+        return "Error: Both first_frame_url and last_frame_url are required"
 
-    # Map aspect ratio
-    aspect_ratio_map = {
-        "auto": "auto",
-        "landscape": "16:9",
-        "portrait": "9:16",
-    }
-    aspect_ratio = aspect_ratio_map.get(args.get("aspect_ratio", "auto"), "auto")
-    duration = args.get("duration", "8s")
-
-    url = "https://fal.run/fal-ai/veo3.1/fast/first-last-frame-to-video"
     payload = {
-        "prompt": prompt,
-        "first_frame_url": first_frame_url,
-        "last_frame_url": last_frame_url,
-        "aspect_ratio": aspect_ratio,
-        "duration": duration,
+        "prompt": args.get("prompt", ""),
+        "first_frame_url": first_frame,
+        "last_frame_url": last_frame,
+        "aspect_ratio": VIDEO_ASPECT_RATIOS.get(args.get("aspect_ratio", "auto"), "auto"),
+        "duration": args.get("duration", "8s"),
         "generate_audio": True,
     }
 
@@ -245,32 +218,38 @@ async def generate_video_impl(args: dict) -> str:
     }
 
     try:
-        # Video generation takes longer - use 5 minute timeout
-        async with httpx.AsyncClient(timeout=300.0) as http_client:
-            response = await http_client.post(url, json=payload, headers=headers)
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.post(
+                "https://fal.run/fal-ai/veo3.1/fast/first-last-frame-to-video",
+                json=payload,
+                headers=headers
+            )
             response.raise_for_status()
             data = response.json()
 
-        video = data.get("video", {})
-        video_url = video.get("url", "")
+        video_url = data.get("video", {}).get("url")
         if not video_url:
-            return "Error: Video URL missing from API response."
+            return "Error: No video URL in response"
 
         return video_url
 
     except httpx.TimeoutException:
-        return "Error: Video generation timed out (5 min). Try a shorter duration or simpler prompt."
+        return "Error: Video generation timed out (5 min)"
     except httpx.HTTPStatusError as e:
-        error_detail = ""
-        try:
-            error_detail = e.response.json().get("detail", e.response.text[:200])
-        except Exception:
-            error_detail = e.response.text[:200]
-        logger.error(f"Fal API error: {e.response.status_code} - {error_detail}")
-        return f"Error: Fal API returned status {e.response.status_code}. {error_detail}"
+        detail = _extract_error_detail(e)
+        logger.error(f"Fal API error: {e.response.status_code} - {detail}")
+        return f"Error: Fal API {e.response.status_code}. {detail}"
     except Exception as e:
         logger.error(f"Video generation error: {e}")
-        return f"Error generating video: {str(e)}"
+        return f"Error: {e}"
+
+
+def _extract_error_detail(error: httpx.HTTPStatusError) -> str:
+    """Extract error detail from Fal API response."""
+    try:
+        return error.response.json().get("detail", error.response.text[:200])
+    except Exception:
+        return error.response.text[:200]
 
 
 # Tool dispatcher

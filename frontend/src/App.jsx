@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 
-// Generate session ID
 const SESSION_ID = crypto.randomUUID()
 
 // Icons
@@ -43,17 +42,14 @@ function App() {
   const [isWaiting, setIsWaiting] = useState(false)
   const [error, setError] = useState(null)
   const [ws, setWs] = useState(null)
-  const [activeTools, setActiveTools] = useState({})
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
-  const fileInputRef = useRef(null)
   const pendingNewTurn = useRef(false)
 
-  // Connect WebSocket
+  // WebSocket connection
   useEffect(() => {
-    const wsUrl = `ws://localhost:8000/ws/${SESSION_ID}`
-    const socket = new WebSocket(wsUrl)
+    const socket = new WebSocket(`ws://localhost:8000/ws/${SESSION_ID}`)
 
     socket.onopen = () => {
       console.log('Connected')
@@ -65,21 +61,15 @@ function App() {
       setError('Connection lost. Please refresh.')
     }
 
-    socket.onerror = () => {
-      setError('Failed to connect to server')
-    }
+    socket.onerror = () => setError('Failed to connect to server')
 
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      handleServerMessage(data)
-    }
+    socket.onmessage = (e) => handleServerMessage(JSON.parse(e.data))
 
     setWs(socket)
-
     return () => socket.close()
   }, [])
 
-  // Handle server messages
+  // Handle incoming WebSocket messages
   const handleServerMessage = useCallback((data) => {
     switch (data.type) {
       case 'thinking':
@@ -89,66 +79,58 @@ function App() {
       case 'text_delta':
         setIsWaiting(false)
         setMessages(prev => {
-          const newMessages = [...prev]
-
-          // Check if we need to start a new message (after tool execution)
+          // Start new message after tool execution
           if (pendingNewTurn.current) {
             pendingNewTurn.current = false
-            newMessages.push({ role: 'assistant', content: data.text, tools: [] })
-            return newMessages
+            return [...prev, { role: 'assistant', content: data.text, tools: [] }]
           }
 
-          const lastMsg = newMessages[newMessages.length - 1]
-          if (lastMsg && lastMsg.role === 'assistant') {
-            // Create new object to ensure React detects the change
-            newMessages[newMessages.length - 1] = {
-              ...lastMsg,
-              content: lastMsg.content + data.text
-            }
-          } else {
-            newMessages.push({ role: 'assistant', content: data.text, tools: [] })
+          const lastMsg = prev[prev.length - 1]
+          if (lastMsg?.role === 'assistant') {
+            return [
+              ...prev.slice(0, -1),
+              { ...lastMsg, content: lastMsg.content + data.text }
+            ]
           }
-          return newMessages
+          return [...prev, { role: 'assistant', content: data.text, tools: [] }]
         })
         break
 
       case 'tool_start':
         setIsWaiting(false)
-        setActiveTools(prev => ({
-          ...prev,
-          [data.tool_id]: { name: data.name, status: 'running' }
-        }))
         setMessages(prev => {
-          const newMessages = [...prev]
-          const lastMsg = newMessages[newMessages.length - 1]
-          if (lastMsg && lastMsg.role === 'assistant') {
-            lastMsg.tools = [...(lastMsg.tools || []), { id: data.tool_id, name: data.name, status: 'running' }]
-          } else {
-            newMessages.push({ role: 'assistant', content: '', tools: [{ id: data.tool_id, name: data.name, status: 'running' }] })
+          const lastMsg = prev[prev.length - 1]
+          const newTool = { id: data.tool_id, name: data.name, status: 'running' }
+
+          if (lastMsg?.role === 'assistant') {
+            return [
+              ...prev.slice(0, -1),
+              { ...lastMsg, tools: [...(lastMsg.tools || []), newTool] }
+            ]
           }
-          return newMessages
+          return [...prev, { role: 'assistant', content: '', tools: [newTool] }]
         })
         break
 
       case 'tool_end':
-        setActiveTools(prev => ({
-          ...prev,
-          [data.tool_id]: { ...prev[data.tool_id], status: 'done' }
-        }))
         setMessages(prev => {
-          const newMessages = [...prev]
-          const lastMsg = newMessages[newMessages.length - 1]
-          if (lastMsg && lastMsg.role === 'assistant' && lastMsg.tools) {
-            lastMsg.tools = lastMsg.tools.map(t =>
-              t.id === data.tool_id ? { ...t, status: 'done' } : t
-            )
+          const lastMsg = prev[prev.length - 1]
+          if (lastMsg?.role === 'assistant' && lastMsg.tools) {
+            return [
+              ...prev.slice(0, -1),
+              {
+                ...lastMsg,
+                tools: lastMsg.tools.map(t =>
+                  t.id === data.tool_id ? { ...t, status: 'done' } : t
+                )
+              }
+            ]
           }
-          return newMessages
+          return prev
         })
         break
 
       case 'new_turn':
-        // Flag that next text_delta should start a new message
         pendingNewTurn.current = true
         break
 
@@ -169,7 +151,7 @@ function App() {
     }
   }, [])
 
-  // Auto-scroll
+  // Auto-scroll on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isThinking])
@@ -182,48 +164,36 @@ function App() {
     }
   }, [input])
 
-  // Handle file selection
   const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files)
-
-    files.forEach(file => {
+    Array.from(e.target.files).forEach(file => {
       const reader = new FileReader()
       reader.onload = (event) => {
-        const base64 = event.target.result.split(',')[1]
-        const isVideo = file.type.startsWith('video/')
-
         setMedia(prev => [...prev, {
-          type: isVideo ? 'video' : 'image',
+          type: file.type.startsWith('video/') ? 'video' : 'image',
           media_type: file.type,
-          data: base64,
+          data: event.target.result.split(',')[1],
           preview: event.target.result,
           name: file.name
         }])
       }
       reader.readAsDataURL(file)
     })
-
     e.target.value = ''
   }
 
-  // Remove media
   const removeMedia = (index) => {
     setMedia(prev => prev.filter((_, i) => i !== index))
   }
 
-  // Send message
   const sendMessage = () => {
     if ((!input.trim() && media.length === 0) || !ws || isThinking) return
 
-    // Add user message to UI
-    const userMessage = {
+    setMessages(prev => [...prev, {
       role: 'user',
       content: input,
       media: media.map(m => ({ type: m.type, preview: m.preview }))
-    }
-    setMessages(prev => [...prev, userMessage])
+    }])
 
-    // Send to server
     ws.send(JSON.stringify({
       type: 'message',
       text: input,
@@ -234,13 +204,11 @@ function App() {
       }))
     }))
 
-    // Show loading and clear input
     setIsWaiting(true)
     setInput('')
     setMedia([])
   }
 
-  // Handle key press
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -248,16 +216,25 @@ function App() {
     }
   }
 
-  // Clear chat
-  const clearChat = () => {
-    if (ws) {
-      ws.send(JSON.stringify({ type: 'clear' }))
+  const clearChat = () => ws?.send(JSON.stringify({ type: 'clear' }))
+
+  // Custom markdown renderer for video links
+  const markdownComponents = {
+    a: ({ href, children }) => {
+      const isVideo = href?.endsWith('.mp4') || (href?.includes('fal.media') && href?.includes('video'))
+      if (isVideo) {
+        return (
+          <video src={href} controls playsInline>
+            <a href={href}>{children}</a>
+          </video>
+        )
+      }
+      return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
     }
   }
 
   return (
     <div className="app">
-      {/* Header */}
       <header className="header">
         <h1>Agent</h1>
         <button onClick={clearChat} title="Clear chat">
@@ -265,10 +242,8 @@ function App() {
         </button>
       </header>
 
-      {/* Error banner */}
       {error && <div className="error">{error}</div>}
 
-      {/* Messages */}
       <div className="messages">
         {messages.length === 0 ? (
           <div className="empty-state">
@@ -278,21 +253,17 @@ function App() {
         ) : (
           messages.map((msg, i) => (
             <div key={i} className={`message ${msg.role}`}>
-              {/* Media attachments */}
-              {msg.media && msg.media.length > 0 && (
+              {msg.media?.length > 0 && (
                 <div className="message-media">
                   {msg.media.map((m, j) => (
-                    m.type === 'video' ? (
-                      <video key={j} src={m.preview} controls />
-                    ) : (
-                      <img key={j} src={m.preview} alt="" />
-                    )
+                    m.type === 'video'
+                      ? <video key={j} src={m.preview} controls />
+                      : <img key={j} src={m.preview} alt="" />
                   ))}
                 </div>
               )}
 
-              {/* Tool calls */}
-              {msg.tools && msg.tools.length > 0 && (
+              {msg.tools?.length > 0 && (
                 <div className="tools">
                   {msg.tools.map(tool => (
                     <div key={tool.id} className={`tool-call ${tool.status}`}>
@@ -306,25 +277,10 @@ function App() {
                 </div>
               )}
 
-              {/* Message content */}
               {msg.content && (
                 <div className="message-content">
                   {msg.role === 'assistant' ? (
-                    <ReactMarkdown
-                      components={{
-                        a: ({href, children}) => {
-                          // Auto-render video URLs as video elements
-                          if (href && (href.endsWith('.mp4') || (href.includes('fal.media') && href.includes('video')))) {
-                            return (
-                              <video src={href} controls playsInline>
-                                <a href={href}>{children}</a>
-                              </video>
-                            );
-                          }
-                          return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
-                        }
-                      }}
-                    >
+                    <ReactMarkdown components={markdownComponents}>
                       {msg.content}
                     </ReactMarkdown>
                   ) : (
@@ -336,7 +292,6 @@ function App() {
           ))
         )}
 
-        {/* Loading indicator */}
         {isWaiting && (
           <div className="message assistant">
             <div className="loading-text">
@@ -351,18 +306,15 @@ function App() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input area */}
       <div className="input-area">
-        {/* Media preview */}
         {media.length > 0 && (
           <div className="media-preview">
             {media.map((m, i) => (
               <div key={i} className="media-preview-item">
-                {m.type === 'video' ? (
-                  <video src={m.preview} />
-                ) : (
-                  <img src={m.preview} alt="" />
-                )}
+                {m.type === 'video'
+                  ? <video src={m.preview} />
+                  : <img src={m.preview} alt="" />
+                }
                 <button onClick={() => removeMedia(i)}>×</button>
               </div>
             ))}
@@ -370,11 +322,9 @@ function App() {
         )}
 
         <div className="input-container">
-          {/* Upload button */}
           <label className="upload-btn">
             <PlusIcon />
             <input
-              ref={fileInputRef}
               type="file"
               accept="image/*,video/*"
               multiple
@@ -382,7 +332,6 @@ function App() {
             />
           </label>
 
-          {/* Text input */}
           <textarea
             ref={inputRef}
             className="text-input"
@@ -393,7 +342,6 @@ function App() {
             rows={1}
           />
 
-          {/* Send button */}
           <button
             className="send-btn"
             onClick={sendMessage}

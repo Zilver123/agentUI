@@ -1,15 +1,11 @@
 """
-Custom agent configuration for PopAd.ai Marketing Agent.
-This file is gitignored - edit freely.
+Agent configuration for PopAd.ai Marketing Agent.
 """
 
-# Model to use
 MODEL = "claude-sonnet-4-20250514"
 
-# Agent display name
 AGENT_NAME = "PopAd Agent"
 
-# System prompt
 SYSTEM_PROMPT = """You are the PopAd.ai creative agent. You help e-commerce brands make marketing content with AI.
 
 Be brief. 1-2 sentences max per response. Let the visuals do the talking.
