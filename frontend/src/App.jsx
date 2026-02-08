@@ -34,6 +34,34 @@ const TrashIcon = () => (
   </svg>
 )
 
+// Parse options from agent message
+const parseOptions = (text) => {
+  const options = []
+
+  // Pattern 1: "A or B?" format
+  const orPattern = /(?:would you like|should I|do you want|prefer)\s+(?:a\s+)?([^?]+?)\s+or\s+(?:a\s+)?([^?]+?)\??$/i
+  const orMatch = text.match(orPattern)
+  if (orMatch) {
+    return [orMatch[1].trim(), orMatch[2].trim()]
+  }
+
+  // Pattern 2: Numbered list (1. 2. format)
+  const numberedPattern = /^\d+\.\s+(.+?)$/gm
+  const numberedMatches = [...text.matchAll(numberedPattern)]
+  if (numberedMatches.length >= 2) {
+    return numberedMatches.map(m => m[1].trim())
+  }
+
+  // Pattern 3: Bullet list (- or * format)
+  const bulletPattern = /^[-*]\s+(.+?)$/gm
+  const bulletMatches = [...text.matchAll(bulletPattern)]
+  if (bulletMatches.length >= 2) {
+    return bulletMatches.map(m => m[1].trim())
+  }
+
+  return options
+}
+
 function App() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -42,7 +70,7 @@ function App() {
   const [isWaiting, setIsWaiting] = useState(false)
   const [error, setError] = useState(null)
   const [ws, setWs] = useState(null)
-  const [responseMode, setResponseMode] = useState('normal')
+  const [responseOptions, setResponseOptions] = useState(null)
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -138,6 +166,17 @@ function App() {
       case 'done':
         setIsThinking(false)
         setIsWaiting(false)
+        // Check if the last assistant message contains options
+        setMessages(prev => {
+          const lastMsg = prev[prev.length - 1]
+          if (lastMsg?.role === 'assistant' && lastMsg.content) {
+            const options = parseOptions(lastMsg.content)
+            if (options.length > 0) {
+              setResponseOptions(options)
+            }
+          }
+          return prev
+        })
         break
 
       case 'error':
@@ -186,29 +225,30 @@ function App() {
     setMedia(prev => prev.filter((_, i) => i !== index))
   }
 
-  const sendMessage = () => {
-    if ((!input.trim() && media.length === 0) || !ws || isThinking) return
+  const sendMessage = (text = null) => {
+    const messageText = text || input
+    if ((!messageText.trim() && media.length === 0) || !ws || isThinking) return
 
     setMessages(prev => [...prev, {
       role: 'user',
-      content: input,
+      content: messageText,
       media: media.map(m => ({ type: m.type, preview: m.preview }))
     }])
 
     ws.send(JSON.stringify({
       type: 'message',
-      text: input,
+      text: messageText,
       media: media.map(m => ({
         type: m.type,
         media_type: m.media_type,
         data: m.data
-      })),
-      response_mode: responseMode
+      }))
     }))
 
     setIsWaiting(true)
     setInput('')
     setMedia([])
+    setResponseOptions(null)
   }
 
   const handleKeyPress = (e) => {
@@ -323,26 +363,28 @@ function App() {
           </div>
         )}
 
-        <div className="response-selector">
-          <button
-            className={responseMode === 'normal' ? 'active' : ''}
-            onClick={() => setResponseMode('normal')}
-          >
-            Normal
-          </button>
-          <button
-            className={responseMode === 'extended' ? 'active' : ''}
-            onClick={() => setResponseMode('extended')}
-          >
-            Extended
-          </button>
-          <button
-            className={responseMode === 'concise' ? 'active' : ''}
-            onClick={() => setResponseMode('concise')}
-          >
-            Concise
-          </button>
-        </div>
+        {responseOptions && responseOptions.length > 0 && (
+          <div className="response-options">
+            {responseOptions.map((option, i) => (
+              <button
+                key={i}
+                className="response-option"
+                onClick={() => sendMessage(option)}
+              >
+                {option}
+              </button>
+            ))}
+            <button
+              className="response-option custom"
+              onClick={() => {
+                setResponseOptions(null)
+                inputRef.current?.focus()
+              }}
+            >
+              Type custom response
+            </button>
+          </div>
+        )}
 
         <div className="input-container">
           <label className="upload-btn">

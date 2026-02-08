@@ -111,11 +111,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             messages.append({"role": "user", "content": content})
             await websocket.send_json({"type": "thinking", "status": True})
 
-            # Get response mode
-            response_mode = data.get("response_mode", "normal")
-
             try:
-                await run_agent_loop(websocket, messages, response_mode)
+                await run_agent_loop(websocket, messages)
             except Exception as e:
                 traceback.print_exc()
                 await websocket.send_json({"type": "error", "message": str(e)})
@@ -126,23 +123,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         logger.info(f"Client {session_id} disconnected")
 
 
-async def run_agent_loop(websocket: WebSocket, messages: list, response_mode: str = "normal"):
+async def run_agent_loop(websocket: WebSocket, messages: list):
     """Run the agent loop: stream response, execute tools, repeat until done."""
     tool_call_count = 0
-
-    # Modify system prompt based on response mode
-    system_prompt = SYSTEM_PROMPT
-    if response_mode == "extended":
-        system_prompt = SYSTEM_PROMPT + "\n\nProvide detailed explanations and elaborate on your responses. Include more context and information about the process."
-    elif response_mode == "concise":
-        system_prompt = SYSTEM_PROMPT + "\n\nBe extremely concise. Use single sentences. No elaboration."
 
     while True:
         # Stream Claude's response
         with client.messages.stream(
             model=MODEL,
             max_tokens=4096,
-            system=system_prompt,
+            system=SYSTEM_PROMPT,
             messages=messages,
             tools=TOOLS_SCHEMA or None,
         ) as stream:
