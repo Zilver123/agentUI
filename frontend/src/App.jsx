@@ -42,6 +42,7 @@ function App() {
   const [isWaiting, setIsWaiting] = useState(false)
   const [error, setError] = useState(null)
   const [ws, setWs] = useState(null)
+  const [responseMode, setResponseMode] = useState('normal')
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -201,7 +202,8 @@ function App() {
         type: m.type,
         media_type: m.media_type,
         data: m.data
-      }))
+      })),
+      response_mode: responseMode
     }))
 
     setIsWaiting(true)
@@ -320,6 +322,27 @@ function App() {
             ))}
           </div>
         )}
+
+        <div className="response-selector">
+          <button
+            className={responseMode === 'normal' ? 'active' : ''}
+            onClick={() => setResponseMode('normal')}
+          >
+            Normal
+          </button>
+          <button
+            className={responseMode === 'extended' ? 'active' : ''}
+            onClick={() => setResponseMode('extended')}
+          >
+            Extended
+          </button>
+          <button
+            className={responseMode === 'concise' ? 'active' : ''}
+            onClick={() => setResponseMode('concise')}
+          >
+            Concise
+          </button>
+        </div>
 
         <div className="input-container">
           <label className="upload-btn">

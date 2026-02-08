@@ -270,6 +270,40 @@ body {
   flex-shrink: 0;
 }
 
+/* Response selector */
+.response-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 4px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.response-selector button {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.response-selector button:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.response-selector button.active {
+  background: var(--accent);
+  color: white;
+}
+
 .input-container {
   display: flex;
   align-items: center;
