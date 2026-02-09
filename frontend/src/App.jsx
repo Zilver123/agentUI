@@ -35,31 +35,74 @@ const TrashIcon = () => (
 )
 
 // Parse options from agent message
+// Returns { options: string[], questionText: string } if exactly 2 options found
+// Returns { options: [], questionText: originalText } otherwise
 const parseOptions = (text) => {
-  const options = []
+  const lines = text.split('\n')
+  const optionMatches = []
+  let questionText = text
 
-  // Pattern 1: "A or B?" format
-  const orPattern = /(?:would you like|should I|do you want|prefer)\s+(?:a\s+)?([^?]+?)\s+or\s+(?:a\s+)?([^?]+?)\??$/i
-  const orMatch = text.match(orPattern)
-  if (orMatch) {
-    return [orMatch[1].trim(), orMatch[2].trim()]
+  // Look for numbered (1. 2.) or bullet (-, •, *) options
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    let optionText = null
+
+    // Check for numbered format (1., 2., etc.)
+    const numberedMatch = line.match(/^(\d+)\.\s+(.+)$/)
+    if (numberedMatch) {
+      optionText = numberedMatch[2].trim()
+    }
+
+    // Check for bullet format (-, •, *)
+    if (!optionText) {
+      const bulletMatch = line.match(/^[-•*]\s+(.+)$/)
+      if (bulletMatch) {
+        optionText = bulletMatch[1].trim()
+      }
+    }
+
+    if (optionText) {
+      optionMatches.push({ index: i, text: optionText, originalLine: line })
+    }
   }
 
-  // Pattern 2: Numbered list (1. 2. format)
-  const numberedPattern = /^\d+\.\s+(.+?)$/gm
-  const numberedMatches = [...text.matchAll(numberedPattern)]
-  if (numberedMatches.length >= 2) {
-    return numberedMatches.map(m => m[1].trim())
+  // Only return options if exactly 2 found
+  if (optionMatches.length === 2) {
+    // Extract question text (everything before first option)
+    const firstOptionIndex = optionMatches[0].index
+    const questionLines = lines.slice(0, firstOptionIndex).join('\n').trim()
+
+    return {
+      options: [optionMatches[0].text, optionMatches[1].text],
+      questionText: questionLines || text
+    }
   }
 
-  // Pattern 3: Bullet list (- or * format)
-  const bulletPattern = /^[-*]\s+(.+?)$/gm
-  const bulletMatches = [...text.matchAll(bulletPattern)]
-  if (bulletMatches.length >= 2) {
-    return bulletMatches.map(m => m[1].trim())
+  // Return empty options and original text if not exactly 2
+  return { options: [], questionText: text }
+}
+
+// Remove option bullets from message content for display
+// Only removes bullets if exactly 2 options are found
+const stripOptionsFromContent = (text, hasOptions) => {
+  if (!hasOptions) return text
+
+  const lines = text.split('\n')
+  const displayLines = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+
+    // Skip lines that are numbered or bullet options
+    const isNumbered = /^(\d+)\.\s+(.+)$/.test(line)
+    const isBullet = /^[-•*]\s+(.+)$/.test(line)
+
+    if (!isNumbered && !isBullet) {
+      displayLines.push(lines[i])
+    }
   }
 
-  return options
+  return displayLines.join('\n').trim()
 }
 
 function App() {
@@ -70,7 +113,8 @@ function App() {
   const [isWaiting, setIsWaiting] = useState(false)
   const [error, setError] = useState(null)
   const [ws, setWs] = useState(null)
-  const [responseOptions, setResponseOptions] = useState(null)
+  const [responseOptions, setResponseOptions] = useState(null) // { options: [], questionText: string }
+  const [responseMessageIndex, setResponseMessageIndex] = useState(null)
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -166,13 +210,18 @@ function App() {
       case 'done':
         setIsThinking(false)
         setIsWaiting(false)
-        // Check if the last assistant message contains options
+        // Check if the last assistant message contains exactly 2 options
         setMessages(prev => {
-          const lastMsg = prev[prev.length - 1]
+          const lastMsgIndex = prev.length - 1
+          const lastMsg = prev[lastMsgIndex]
           if (lastMsg?.role === 'assistant' && lastMsg.content) {
-            const options = parseOptions(lastMsg.content)
-            if (options.length > 0) {
-              setResponseOptions(options)
+            const parsed = parseOptions(lastMsg.content)
+            if (parsed.options.length === 2) {
+              setResponseOptions(parsed)
+              setResponseMessageIndex(lastMsgIndex)
+            } else {
+              setResponseOptions(null)
+              setResponseMessageIndex(null)
             }
           }
           return prev
@@ -249,6 +298,7 @@ function App() {
     setInput('')
     setMedia([])
     setResponseOptions(null)
+    setResponseMessageIndex(null)
   }
 
   const handleKeyPress = (e) => {
@@ -293,45 +343,53 @@ function App() {
             <p>Send a message to get started.<br />You can also attach images or videos.</p>
           </div>
         ) : (
-          messages.map((msg, i) => (
-            <div key={i} className={`message ${msg.role}`}>
-              {msg.media?.length > 0 && (
-                <div className="message-media">
-                  {msg.media.map((m, j) => (
-                    m.type === 'video'
-                      ? <video key={j} src={m.preview} controls />
-                      : <img key={j} src={m.preview} alt="" />
-                  ))}
-                </div>
-              )}
+          messages.map((msg, i) => {
+            // Check if this message has response options
+            const hasOptions = responseMessageIndex === i && responseOptions?.options.length === 2
+            const displayContent = hasOptions 
+              ? stripOptionsFromContent(msg.content, true)
+              : msg.content
 
-              {msg.tools?.length > 0 && (
-                <div className="tools">
-                  {msg.tools.map(tool => (
-                    <div key={tool.id} className={`tool-call ${tool.status}`}>
-                      <ToolIcon />
-                      <span className="name">{tool.name}</span>
-                      <span className="status">
-                        {tool.status === 'running' ? 'Running...' : <CheckIcon />}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
+            return (
+              <div key={i} className={`message ${msg.role}`}>
+                {msg.media?.length > 0 && (
+                  <div className="message-media">
+                    {msg.media.map((m, j) => (
+                      m.type === 'video'
+                        ? <video key={j} src={m.preview} controls />
+                        : <img key={j} src={m.preview} alt="" />
+                    ))}
+                  </div>
+                )}
 
-              {msg.content && (
-                <div className="message-content">
-                  {msg.role === 'assistant' ? (
-                    <ReactMarkdown components={markdownComponents}>
-                      {msg.content}
-                    </ReactMarkdown>
-                  ) : (
-                    msg.content
-                  )}
-                </div>
-              )}
-            </div>
-          ))
+                {msg.tools?.length > 0 && (
+                  <div className="tools">
+                    {msg.tools.map(tool => (
+                      <div key={tool.id} className={`tool-call ${tool.status}`}>
+                        <ToolIcon />
+                        <span className="name">{tool.name}</span>
+                        <span className="status">
+                          {tool.status === 'running' ? 'Running...' : <CheckIcon />}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {displayContent && (
+                  <div className="message-content">
+                    {msg.role === 'assistant' ? (
+                      <ReactMarkdown components={markdownComponents}>
+                        {displayContent}
+                      </ReactMarkdown>
+                    ) : (
+                      displayContent
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })
         )}
 
         {isWaiting && (
@@ -363,9 +421,9 @@ function App() {
           </div>
         )}
 
-        {responseOptions && responseOptions.length > 0 && (
+        {responseOptions && responseOptions.options.length === 2 && (
           <div className="response-options">
-            {responseOptions.map((option, i) => (
+            {responseOptions.options.map((option, i) => (
               <button
                 key={i}
                 className="response-option"
@@ -374,15 +432,6 @@ function App() {
                 {option}
               </button>
             ))}
-            <button
-              className="response-option custom"
-              onClick={() => {
-                setResponseOptions(null)
-                inputRef.current?.focus()
-              }}
-            >
-              Type custom response
-            </button>
           </div>
         )}
 
