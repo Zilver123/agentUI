@@ -42,23 +42,34 @@ const parseOptions = (text) => {
   const optionMatches = []
   let questionText = text
 
+  console.log('[parseOptions] Input text:', text.substring(0, 100) + '...')
+  console.log('[parseOptions] Total lines:', lines.length)
+
   // Look for numbered (1. 2.) or bullet (-, •, *) options
+  // STRICT: Must match exact format at line start with content after
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim()
     let optionText = null
 
-    // Check for numbered format (1., 2., etc.)
-    const numberedMatch = line.match(/^(\d+)\.\s+(.+)$/)
-    if (numberedMatch) {
+    // Check for numbered format (1., 2., etc.) - STRICT: only single or double digit numbers
+    const numberedMatch = line.match(/^(\d{1,2})\.\s+(.+)$/)
+    if (numberedMatch && numberedMatch[2].length > 0) {
       optionText = numberedMatch[2].trim()
+      console.log(`[parseOptions] Line ${i} matched NUMBERED: "${line}" -> option: "${optionText}"`)
     }
 
-    // Check for bullet format (-, •, *)
+    // Check for bullet format (-, •, *) - STRICT: only these exact characters
     if (!optionText) {
-      const bulletMatch = line.match(/^[-•*]\s+(.+)$/)
-      if (bulletMatch) {
-        optionText = bulletMatch[1].trim()
+      const bulletMatch = line.match(/^([-•*])\s+(.+)$/)
+      if (bulletMatch && bulletMatch[2].length > 0) {
+        optionText = bulletMatch[2].trim()
+        console.log(`[parseOptions] Line ${i} matched BULLET: "${line}" -> option: "${optionText}"`)
       }
+    }
+
+    // Debug: show lines that didn't match
+    if (!optionText && line.length > 0) {
+      console.log(`[parseOptions] Line ${i} NO MATCH: "${line.substring(0, 50)}"`)
     }
 
     if (optionText) {
@@ -66,8 +77,11 @@ const parseOptions = (text) => {
     }
   }
 
-  // Only return options if exactly 2 found
+  console.log(`[parseOptions] Found ${optionMatches.length} options`)
+  
+  // Only return options if EXACTLY 2 found
   if (optionMatches.length === 2) {
+    console.log('[parseOptions] ✓ EXACTLY 2 options detected - showing UI')
     // Extract question text (everything before first option)
     const firstOptionIndex = optionMatches[0].index
     const questionLines = lines.slice(0, firstOptionIndex).join('\n').trim()
@@ -78,6 +92,7 @@ const parseOptions = (text) => {
     }
   }
 
+  console.log('[parseOptions] ✗ Not exactly 2 options - no UI shown')
   // Return empty options and original text if not exactly 2
   return { options: [], questionText: text }
 }
@@ -89,19 +104,24 @@ const stripOptionsFromContent = (text, hasOptions) => {
 
   const lines = text.split('\n')
   const displayLines = []
+  let strippedCount = 0
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim()
 
-    // Skip lines that are numbered or bullet options
-    const isNumbered = /^(\d+)\.\s+(.+)$/.test(line)
-    const isBullet = /^[-•*]\s+(.+)$/.test(line)
+    // Skip lines that are numbered or bullet options (STRICT matching)
+    const isNumbered = /^(\d{1,2})\.\s+(.+)$/.test(line)
+    const isBullet = /^([-•*])\s+(.+)$/.test(line)
 
     if (!isNumbered && !isBullet) {
       displayLines.push(lines[i])
+    } else {
+      strippedCount++
+      console.log(`[stripOptionsFromContent] Removed option line: "${line}"`)
     }
   }
 
+  console.log(`[stripOptionsFromContent] Stripped ${strippedCount} option lines from message`)
   return displayLines.join('\n').trim()
 }
 
