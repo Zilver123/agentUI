@@ -35,7 +35,7 @@ app.add_middleware(
 
 client = Anthropic()
 
-MAX_TOOL_CALLS = 5
+MAX_TOOL_CALLS = 6
 
 
 async def upload_base64_to_fal(base64_data: str, media_type: str) -> str | None:
