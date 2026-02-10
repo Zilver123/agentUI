@@ -111,6 +111,32 @@ TOOLS_SCHEMA = [
             "required": ["prompt", "first_frame_url", "last_frame_url"]
         }
     },
+    {
+        "name": "ask_question",
+        "description": "Present a decision tree question to the user when their request is vague or needs clarification. Use this to guide users through choices until you have enough information to proceed with other tools. Returns the user's selected option.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": "The question to ask the user"
+                },
+                "option1": {
+                    "type": "string",
+                    "description": "First option for the user to choose"
+                },
+                "option2": {
+                    "type": "string",
+                    "description": "Second option for the user to choose"
+                },
+                "option3": {
+                    "type": "string",
+                    "description": "Optional third option for the user to choose"
+                }
+            },
+            "required": ["question", "option1", "option2"]
+        }
+    },
 ]
 
 
@@ -285,6 +311,40 @@ def _extract_error_detail(error: httpx.HTTPStatusError) -> str:
         return error.response.text[:200]
 
 
+async def ask_question_impl(args: dict) -> str:
+    """
+    Present a question with 2-3 options to the user.
+    Returns a special format that the frontend will render as clickable buttons.
+    The tool execution will pause until the user selects an option.
+    """
+    import json
+
+    question = args.get("question", "")
+    option1 = args.get("option1", "")
+    option2 = args.get("option2", "")
+    option3 = args.get("option3")
+
+    if not question or not option1 or not option2:
+        return "Error: question, option1, and option2 are required"
+
+    # Build options list
+    options = [option1, option2]
+    if option3:
+        options.append(option3)
+
+    # Return JSON that the backend will parse, plus a message for Claude
+    # The JSON is used by main.py to send to frontend
+    # The text after is what Claude sees as the tool result
+    json_data = json.dumps({
+        "type": "question",
+        "question": question,
+        "options": options
+    })
+
+    # Return format: JSON on first line, then human-readable message
+    return f"{json_data}\n\nQuestion presented to user. Waiting for their selection from the {len(options)} options provided."
+
+
 # Tool dispatcher
 TOOL_HANDLERS = {
     "select_style": select_style_impl,
@@ -292,6 +352,7 @@ TOOL_HANDLERS = {
     "calculator": calculator_impl,
     "generate_image": generate_image_impl,
     "generate_video": generate_video_impl,
+    "ask_question": ask_question_impl,
 }
 
 

@@ -184,8 +184,29 @@ async def run_agent_loop(websocket: WebSocket, messages: list):
 
         # Execute tools
         tool_results = []
+        has_ask_question = False
+
         for tool_use in tool_uses:
             result = await execute_tool(tool_use.name, tool_use.input)
+
+            # Check if this is an ask_question tool result with special formatting
+            if tool_use.name == "ask_question":
+                has_ask_question = True
+                try:
+                    import json
+                    # The result format is: JSON on first line, then message for Claude
+                    first_line = result.split('\n')[0]
+                    question_data = json.loads(first_line)
+                    if question_data.get("type") == "question":
+                        # Send question to frontend for rendering
+                        await websocket.send_json({
+                            "type": "question",
+                            "question": question_data.get("question"),
+                            "options": question_data.get("options")
+                        })
+                except (json.JSONDecodeError, KeyError, IndexError):
+                    pass  # If parsing fails, treat as normal tool result
+
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": tool_use.id,
@@ -193,9 +214,16 @@ async def run_agent_loop(websocket: WebSocket, messages: list):
             })
             await websocket.send_json({"type": "tool_end", "tool_id": tool_use.id})
 
+        # Always add tool results to messages (required by Claude API)
         messages.append({"role": "user", "content": tool_results})
 
-        # Signal new turn for frontend
+        # If ask_question was called, stop the loop and wait for user response
+        # The next user message will be their selection
+        if has_ask_question:
+            await websocket.send_json({"type": "done"})
+            break
+
+        # Signal new turn for frontend (only if continuing the loop)
         await websocket.send_json({"type": "new_turn"})
 
     await websocket.send_json({"type": "done"})

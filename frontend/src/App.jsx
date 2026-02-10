@@ -227,24 +227,46 @@ function App() {
         pendingNewTurn.current = true
         break
 
+      case 'question':
+        // Handle ask_question tool - set response options from tool call
+        console.log('[question event] Received question:', data.question, 'with options:', data.options)
+        setResponseOptions({
+          question: data.question,
+          options: data.options,
+          questionText: data.question
+        })
+        setResponseMessageIndex(null) // Not tied to a specific message
+        console.log('[question event] Response options set')
+        break
+
       case 'done':
         setIsThinking(false)
         setIsWaiting(false)
-        // Check if the last assistant message contains exactly 2 options
-        setMessages(prev => {
-          const lastMsgIndex = prev.length - 1
-          const lastMsg = prev[lastMsgIndex]
-          if (lastMsg?.role === 'assistant' && lastMsg.content) {
-            const parsed = parseOptions(lastMsg.content)
-            if (parsed.options.length === 2) {
-              setResponseOptions(parsed)
-              setResponseMessageIndex(lastMsgIndex)
-            } else {
-              setResponseOptions(null)
-              setResponseMessageIndex(null)
+        // Check if the last assistant message contains exactly 2 options (legacy text parsing)
+        // Use functional updates to avoid stale closure issues
+        setMessages(prevMessages => {
+          const lastMsgIndex = prevMessages.length - 1
+          const lastMsg = prevMessages[lastMsgIndex]
+
+          // Check current responseOptions state
+          setResponseOptions(currentOptions => {
+            if (currentOptions) {
+              // Already set by ask_question tool, keep it
+              return currentOptions
             }
-          }
-          return prev
+
+            // Try legacy text parsing
+            if (lastMsg?.role === 'assistant' && lastMsg.content) {
+              const parsed = parseOptions(lastMsg.content)
+              if (parsed.options.length === 2) {
+                setResponseMessageIndex(lastMsgIndex)
+                return parsed
+              }
+            }
+            return null
+          })
+
+          return prevMessages
         })
         break
 
@@ -441,7 +463,7 @@ function App() {
           </div>
         )}
 
-        {responseOptions && responseOptions.options.length === 2 && (
+        {responseOptions && responseOptions.options && responseOptions.options.length >= 2 && (
           <div className="response-options">
             {responseOptions.options.map((option, i) => (
               <button
