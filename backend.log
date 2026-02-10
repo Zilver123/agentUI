@@ -1,0 +1,51 @@
+INFO:     Started server process [49282]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ERROR:    [Errno 48] error while attempting to bind on address ('0.0.0.0', 8000): address already in use
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     connection closed
+INFO:     127.0.0.1:58362 - "WebSocket /ws/64dd8b6d-93d1-4047-9ed4-9610b9cbf62b" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:58479 - "WebSocket /ws/10ac71cf-b3ba-46ef-8256-fd92f57dd4a7" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:58481 - "WebSocket /ws/10ac71cf-b3ba-46ef-8256-fd92f57dd4a7" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:58784 - "WebSocket /ws/e4480fb2-ea9d-4631-ac6c-01af6a67253c" [accepted]
+INFO:     connection closed
+INFO:     127.0.0.1:58785 - "WebSocket /ws/e4480fb2-ea9d-4631-ac6c-01af6a67253c" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:58957 - "WebSocket /ws/81f9cc25-aae5-4ccc-9b13-1f253e3c44ad" [accepted]
+INFO:     connection closed
+INFO:     127.0.0.1:58959 - "WebSocket /ws/81f9cc25-aae5-4ccc-9b13-1f253e3c44ad" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:59198 - "WebSocket /ws/bc6dcf5d-b3ed-4938-9d86-1d3c6c76613d" [accepted]
+INFO:     connection closed
+INFO:     127.0.0.1:59200 - "WebSocket /ws/bc6dcf5d-b3ed-4938-9d86-1d3c6c76613d" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:59236 - "WebSocket /ws/8acda120-2f35-4977-ba13-a3e1be5a37f0" [accepted]
+INFO:     connection closed
+INFO:     127.0.0.1:59238 - "WebSocket /ws/8acda120-2f35-4977-ba13-a3e1be5a37f0" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:58726 - "WebSocket /ws/d264ed66-8205-4a42-a152-8aedb5a1b167" [accepted]
+INFO:     connection closed
+INFO:     127.0.0.1:58727 - "WebSocket /ws/d264ed66-8205-4a42-a152-8aedb5a1b167" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:59399 - "WebSocket /ws/6a7da1e3-29fa-449e-bdcf-e01d15420300" [accepted]
+INFO:     connection closed
+INFO:     127.0.0.1:59400 - "WebSocket /ws/6a7da1e3-29fa-449e-bdcf-e01d15420300" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:59409 - "WebSocket /ws/7fa5d303-5aef-4fad-a7de-deb7ac50192a" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:59410 - "WebSocket /ws/7fa5d303-5aef-4fad-a7de-deb7ac50192a" [accepted]
+INFO:     connection closed
+INFO:     connection open

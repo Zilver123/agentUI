@@ -18,6 +18,21 @@ VIDEO_ASPECT_RATIOS = {"auto": "auto", "landscape": "16:9", "portrait": "9:16"}
 # Tool schemas for Claude API
 TOOLS_SCHEMA = [
     {
+        "name": "select_style",
+        "description": "Load style-specific creative guidance. MUST be called before generate_image or generate_video. Returns image guidance, video guidance, and tone for the selected style.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "style": {
+                    "type": "string",
+                    "enum": ["ugc", "product_showcase", "digital_service", "physical_service"],
+                    "description": "The content style to apply. Choose based on the user's request."
+                }
+            },
+            "required": ["style"]
+        }
+    },
+    {
         "name": "get_current_time",
         "description": "Get the current date and time",
         "input_schema": {
@@ -100,6 +115,24 @@ TOOLS_SCHEMA = [
 
 
 # Tool implementations
+
+async def select_style_impl(args: dict) -> str:
+    """Return style-specific creative guidance."""
+    from config import STYLE_PROMPTS
+
+    style_key = args.get("style", "")
+    style = STYLE_PROMPTS.get(style_key)
+    if not style:
+        available = ", ".join(STYLE_PROMPTS.keys())
+        return f"Error: Unknown style '{style_key}'. Available styles: {available}"
+
+    return (
+        f"Style: {style['name']}\n"
+        f"Tone: {style['tone']}\n\n"
+        f"Image Guidance: {style['image_guidance']}\n\n"
+        f"Video Guidance: {style['video_guidance']}"
+    )
+
 
 async def get_current_time_impl(_args: dict) -> str:
     """Returns the current date and time."""
@@ -254,6 +287,7 @@ def _extract_error_detail(error: httpx.HTTPStatusError) -> str:
 
 # Tool dispatcher
 TOOL_HANDLERS = {
+    "select_style": select_style_impl,
     "get_current_time": get_current_time_impl,
     "calculator": calculator_impl,
     "generate_image": generate_image_impl,
