@@ -21,6 +21,13 @@ frontend/node_modules/
 *.swo
 *~
 
+# Logs and PIDs
+*.log
+*.pid
+
+# Claude Code
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
