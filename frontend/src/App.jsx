@@ -34,6 +34,43 @@ const TrashIcon = () => (
   </svg>
 )
 
+const ExpandIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M15 3H21V9M9 21H3V15M21 3L14 10M3 21L10 14" />
+  </svg>
+)
+
+const DownloadIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M21 15V19C21 20.1 20.1 21 19 21H5C3.9 21 3 20.1 3 19V15M7 10L12 15L17 10M12 15V3" />
+  </svg>
+)
+
+const ShareIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M4 12V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V12M16 6L12 2L8 6M12 2V15" />
+  </svg>
+)
+
+const CopyLinkIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </svg>
+)
+
+const CheckSmallIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M20 6L9 17L4 12" />
+  </svg>
+)
+
+const CloseIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M18 6L6 18M6 6L18 18" />
+  </svg>
+)
+
 // Parse options from agent message
 // Returns { options: string[], questionText: string } if exactly 2 options found
 // Returns { options: [], questionText: originalText } otherwise
@@ -135,6 +172,8 @@ function App() {
   const [ws, setWs] = useState(null)
   const [responseOptions, setResponseOptions] = useState(null) // { options: [], questionText: string }
   const [responseMessageIndex, setResponseMessageIndex] = useState(null)
+  const [lightbox, setLightbox] = useState(null) // { type: 'image'|'video', src: string }
+  const [copiedUrl, setCopiedUrl] = useState(null) // briefly holds the URL that was just copied
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -352,19 +391,105 @@ function App() {
 
   const clearChat = () => ws?.send(JSON.stringify({ type: 'clear' }))
 
-  // Custom markdown renderer for video links
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+
+  const handleDesktopDownload = async (url, type) => {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = `popad-${Date.now()}.${type === 'video' ? 'mp4' : 'png'}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(blobUrl)
+    } catch {
+      window.open(url, '_blank')
+    }
+  }
+
+  const handleMobileShare = async (url, type) => {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const ext = type === 'video' ? 'mp4' : 'png'
+      const mimeType = type === 'video' ? 'video/mp4' : 'image/png'
+      const file = new File([blob], `popad-${Date.now()}.${ext}`, { type: mimeType })
+
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file] })
+      } else {
+        // Fallback: open in new tab
+        window.open(url, '_blank')
+      }
+    } catch (err) {
+      // User cancelled share or share failed — ignore AbortError
+      if (err.name !== 'AbortError') {
+        window.open(url, '_blank')
+      }
+    }
+  }
+
+  const handleDownload = (url, type) => {
+    if (isMobile) {
+      handleMobileShare(url, type)
+    } else {
+      handleDesktopDownload(url, type)
+    }
+  }
+
+  const handleCopyUrl = (url) => {
+    navigator.clipboard.writeText(url)
+    setCopiedUrl(url)
+    setTimeout(() => setCopiedUrl(null), 1500)
+  }
+
+  // Wrapper that adds preview/download/copy overlay icons to generated media
+  const MediaWrapper = ({ children, src, type }) => (
+    <div className="media-wrapper">
+      {children}
+      <div className="media-actions">
+        <button className="media-action-btn" onClick={() => setLightbox({ type, src })} title="Preview">
+          <ExpandIcon />
+        </button>
+        <button className="media-action-btn" onClick={() => handleCopyUrl(src)} title="Copy URL">
+          {copiedUrl === src ? <CheckSmallIcon /> : <CopyLinkIcon />}
+        </button>
+        {isMobile ? (
+          <button className="media-action-btn" onClick={() => handleMobileShare(src, type)} title="Save">
+            <ShareIcon />
+          </button>
+        ) : (
+          <button className="media-action-btn" onClick={() => handleDesktopDownload(src, type)} title="Download">
+            <DownloadIcon />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+
+  // Custom markdown renderer for video links and images
   const markdownComponents = {
     a: ({ href, children }) => {
       const isVideo = href?.endsWith('.mp4') || (href?.includes('fal.media') && href?.includes('video'))
       if (isVideo) {
         return (
-          <video src={href} controls playsInline>
-            <a href={href}>{children}</a>
-          </video>
+          <MediaWrapper src={href} type="video">
+            <video src={href} controls playsInline>
+              <a href={href}>{children}</a>
+            </video>
+          </MediaWrapper>
         )
       }
       return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
-    }
+    },
+    img: ({ src, alt }) => (
+      <MediaWrapper src={src} type="image">
+        <img src={src} alt={alt || ''} />
+      </MediaWrapper>
+    )
   }
 
   return (
@@ -510,6 +635,35 @@ function App() {
           </button>
         </div>
       </div>
+
+      {lightbox && (
+        <div className="lightbox-overlay" onClick={() => setLightbox(null)}>
+          <div className="lightbox-toolbar">
+            <button className="lightbox-btn" onClick={(e) => { e.stopPropagation(); handleCopyUrl(lightbox.src) }} title="Copy URL">
+              {copiedUrl === lightbox.src ? <CheckSmallIcon /> : <CopyLinkIcon />}
+            </button>
+            {isMobile ? (
+              <button className="lightbox-btn" onClick={(e) => { e.stopPropagation(); handleMobileShare(lightbox.src, lightbox.type) }} title="Save">
+                <ShareIcon />
+              </button>
+            ) : (
+              <button className="lightbox-btn" onClick={(e) => { e.stopPropagation(); handleDesktopDownload(lightbox.src, lightbox.type) }} title="Download">
+                <DownloadIcon />
+              </button>
+            )}
+            <button className="lightbox-btn" onClick={() => setLightbox(null)} title="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+            {lightbox.type === 'video' ? (
+              <video src={lightbox.src} controls playsInline autoPlay />
+            ) : (
+              <img src={lightbox.src} alt="" />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

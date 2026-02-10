@@ -161,6 +161,67 @@ body {
   padding: 0;
 }
 
+/* Media wrapper with overlay icons */
+.media-wrapper {
+  position: relative;
+  display: inline-block;
+  margin: 12px 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.media-wrapper img,
+.media-wrapper video {
+  display: block;
+  max-width: 100%;
+  max-height: 500px;
+  border-radius: 12px;
+  object-fit: contain;
+  margin: 0;
+}
+
+.media-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.media-wrapper:hover .media-actions {
+  opacity: 1;
+}
+
+/* On touch devices, always show the icons since hover doesn't exist */
+@media (hover: none) {
+  .media-actions {
+    opacity: 1;
+  }
+}
+
+.media-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.media-action-btn:hover {
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+}
+
 /* Generated images in assistant messages (rendered by ReactMarkdown) */
 .message-content img {
   display: block;
@@ -169,12 +230,6 @@ body {
   border-radius: 12px;
   margin: 12px 0;
   object-fit: contain;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.message-content img:hover {
-  opacity: 0.9;
 }
 
 /* Links in messages */
@@ -194,6 +249,67 @@ body {
   max-height: 400px;
   border-radius: 12px;
   margin: 12px 0;
+}
+
+/* Lightbox / Preview modal */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+.lightbox-toolbar {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 1001;
+}
+
+.lightbox-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.lightbox-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.lightbox-content {
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.lightbox-content img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+.lightbox-content video {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 12px;
 }
 
 /* Media in messages */
