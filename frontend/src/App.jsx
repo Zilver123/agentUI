@@ -34,6 +34,97 @@ const TrashIcon = () => (
   </svg>
 )
 
+// Parse options from agent message
+// Returns { options: string[], questionText: string } if exactly 2 options found
+// Returns { options: [], questionText: originalText } otherwise
+const parseOptions = (text) => {
+  const lines = text.split('\n')
+  const optionMatches = []
+  let questionText = text
+
+  console.log('[parseOptions] Input text:', text.substring(0, 100) + '...')
+  console.log('[parseOptions] Total lines:', lines.length)
+
+  // Look for numbered (1. 2.) or bullet (-, •, *) options
+  // STRICT: Must match exact format at line start with content after
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    let optionText = null
+
+    // Check for numbered format (1., 2., etc.) - STRICT: only single or double digit numbers
+    const numberedMatch = line.match(/^(\d{1,2})\.\s+(.+)$/)
+    if (numberedMatch && numberedMatch[2].length > 0) {
+      optionText = numberedMatch[2].trim()
+      console.log(`[parseOptions] Line ${i} matched NUMBERED: "${line}" -> option: "${optionText}"`)
+    }
+
+    // Check for bullet format (-, •, *) - STRICT: only these exact characters
+    if (!optionText) {
+      const bulletMatch = line.match(/^([-•*])\s+(.+)$/)
+      if (bulletMatch && bulletMatch[2].length > 0) {
+        optionText = bulletMatch[2].trim()
+        console.log(`[parseOptions] Line ${i} matched BULLET: "${line}" -> option: "${optionText}"`)
+      }
+    }
+
+    // Debug: show lines that didn't match
+    if (!optionText && line.length > 0) {
+      console.log(`[parseOptions] Line ${i} NO MATCH: "${line.substring(0, 50)}"`)
+    }
+
+    if (optionText) {
+      optionMatches.push({ index: i, text: optionText, originalLine: line })
+    }
+  }
+
+  console.log(`[parseOptions] Found ${optionMatches.length} options`)
+  
+  // Only return options if EXACTLY 2 found
+  if (optionMatches.length === 2) {
+    console.log('[parseOptions] ✓ EXACTLY 2 options detected - showing UI')
+    // Extract question text (everything before first option)
+    const firstOptionIndex = optionMatches[0].index
+    const questionLines = lines.slice(0, firstOptionIndex).join('\n').trim()
+
+    return {
+      options: [optionMatches[0].text, optionMatches[1].text],
+      questionText: questionLines || text
+    }
+  }
+
+  console.log('[parseOptions] ✗ Not exactly 2 options - no UI shown')
+  // Return empty options and original text if not exactly 2
+  return { options: [], questionText: text }
+}
+
+// Remove option bullets from message content for display
+// Only removes bullets if exactly 2 options are found
+const stripOptionsFromContent = (text, hasOptions) => {
+  if (!hasOptions) return text
+
+  const lines = text.split('\n')
+  const displayLines = []
+  let strippedCount = 0
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+
+    // Skip lines that are numbered or bullet options (STRICT matching)
+    const isNumbered = /^(\d{1,2})\.\s+(.+)$/.test(line)
+    const isBullet = /^([-•*])\s+(.+)$/.test(line)
+
+    if (!isNumbered && !isBullet) {
+      displayLines.push(lines[i])
+    } else {
+      strippedCount++
+      console.log(`[stripOptionsFromContent] Removed option line: "${line}"`)
+    }
+  }
+
+  console.log(`[stripOptionsFromContent] Stripped ${strippedCount} option lines from message`)
+  return displayLines.join('\n').trim()
+}
+
 function App() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -42,6 +133,8 @@ function App() {
   const [isWaiting, setIsWaiting] = useState(false)
   const [error, setError] = useState(null)
   const [ws, setWs] = useState(null)
+  const [responseOptions, setResponseOptions] = useState(null) // { options: [], questionText: string }
+  const [responseMessageIndex, setResponseMessageIndex] = useState(null)
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -137,6 +230,22 @@ function App() {
       case 'done':
         setIsThinking(false)
         setIsWaiting(false)
+        // Check if the last assistant message contains exactly 2 options
+        setMessages(prev => {
+          const lastMsgIndex = prev.length - 1
+          const lastMsg = prev[lastMsgIndex]
+          if (lastMsg?.role === 'assistant' && lastMsg.content) {
+            const parsed = parseOptions(lastMsg.content)
+            if (parsed.options.length === 2) {
+              setResponseOptions(parsed)
+              setResponseMessageIndex(lastMsgIndex)
+            } else {
+              setResponseOptions(null)
+              setResponseMessageIndex(null)
+            }
+          }
+          return prev
+        })
         break
 
       case 'error':
@@ -185,18 +294,19 @@ function App() {
     setMedia(prev => prev.filter((_, i) => i !== index))
   }
 
-  const sendMessage = () => {
-    if ((!input.trim() && media.length === 0) || !ws || isThinking) return
+  const sendMessage = (text = null) => {
+    const messageText = text || input
+    if ((!messageText.trim() && media.length === 0) || !ws || isThinking) return
 
     setMessages(prev => [...prev, {
       role: 'user',
-      content: input,
+      content: messageText,
       media: media.map(m => ({ type: m.type, preview: m.preview }))
     }])
 
     ws.send(JSON.stringify({
       type: 'message',
-      text: input,
+      text: messageText,
       media: media.map(m => ({
         type: m.type,
         media_type: m.media_type,
@@ -207,6 +317,8 @@ function App() {
     setIsWaiting(true)
     setInput('')
     setMedia([])
+    setResponseOptions(null)
+    setResponseMessageIndex(null)
   }
 
   const handleKeyPress = (e) => {
@@ -251,45 +363,53 @@ function App() {
             <p>Send a message to get started.<br />You can also attach images or videos.</p>
           </div>
         ) : (
-          messages.map((msg, i) => (
-            <div key={i} className={`message ${msg.role}`}>
-              {msg.media?.length > 0 && (
-                <div className="message-media">
-                  {msg.media.map((m, j) => (
-                    m.type === 'video'
-                      ? <video key={j} src={m.preview} controls />
-                      : <img key={j} src={m.preview} alt="" />
-                  ))}
-                </div>
-              )}
+          messages.map((msg, i) => {
+            // Check if this message has response options
+            const hasOptions = responseMessageIndex === i && responseOptions?.options.length === 2
+            const displayContent = hasOptions 
+              ? stripOptionsFromContent(msg.content, true)
+              : msg.content
 
-              {msg.tools?.length > 0 && (
-                <div className="tools">
-                  {msg.tools.map(tool => (
-                    <div key={tool.id} className={`tool-call ${tool.status}`}>
-                      <ToolIcon />
-                      <span className="name">{tool.name}</span>
-                      <span className="status">
-                        {tool.status === 'running' ? 'Running...' : <CheckIcon />}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
+            return (
+              <div key={i} className={`message ${msg.role}`}>
+                {msg.media?.length > 0 && (
+                  <div className="message-media">
+                    {msg.media.map((m, j) => (
+                      m.type === 'video'
+                        ? <video key={j} src={m.preview} controls />
+                        : <img key={j} src={m.preview} alt="" />
+                    ))}
+                  </div>
+                )}
 
-              {msg.content && (
-                <div className="message-content">
-                  {msg.role === 'assistant' ? (
-                    <ReactMarkdown components={markdownComponents}>
-                      {msg.content}
-                    </ReactMarkdown>
-                  ) : (
-                    msg.content
-                  )}
-                </div>
-              )}
-            </div>
-          ))
+                {msg.tools?.length > 0 && (
+                  <div className="tools">
+                    {msg.tools.map(tool => (
+                      <div key={tool.id} className={`tool-call ${tool.status}`}>
+                        <ToolIcon />
+                        <span className="name">{tool.name}</span>
+                        <span className="status">
+                          {tool.status === 'running' ? 'Running...' : <CheckIcon />}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {displayContent && (
+                  <div className="message-content">
+                    {msg.role === 'assistant' ? (
+                      <ReactMarkdown components={markdownComponents}>
+                        {displayContent}
+                      </ReactMarkdown>
+                    ) : (
+                      displayContent
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })
         )}
 
         {isWaiting && (
@@ -317,6 +437,20 @@ function App() {
                 }
                 <button onClick={() => removeMedia(i)}>×</button>
               </div>
+            ))}
+          </div>
+        )}
+
+        {responseOptions && responseOptions.options.length === 2 && (
+          <div className="response-options">
+            {responseOptions.options.map((option, i) => (
+              <button
+                key={i}
+                className="response-option"
+                onClick={() => sendMessage(option)}
+              >
+                {option}
+              </button>
             ))}
           </div>
         )}
