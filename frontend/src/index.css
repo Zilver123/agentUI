@@ -163,10 +163,11 @@ body {
 
 /* Generated images in assistant messages (rendered by ReactMarkdown) */
 .message-content img {
+  display: block;
   max-width: 100%;
   max-height: 500px;
   border-radius: 12px;
-  margin: 8px 0;
+  margin: 12px 0;
   object-fit: contain;
   cursor: pointer;
   transition: opacity 0.2s;
@@ -188,10 +189,11 @@ body {
 
 /* Generated videos in assistant messages */
 .message-content video {
+  display: block;
   max-width: 100%;
   max-height: 400px;
   border-radius: 12px;
-  margin: 8px 0;
+  margin: 12px 0;
 }
 
 /* Media in messages */
@@ -280,6 +282,13 @@ body {
   background: var(--bg-secondary);
   border-radius: 12px;
   border: 1px solid var(--border);
+}
+
+.response-question {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .response-option {

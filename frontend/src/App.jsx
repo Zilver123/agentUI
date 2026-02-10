@@ -465,6 +465,9 @@ function App() {
 
         {responseOptions && responseOptions.options && responseOptions.options.length >= 2 && (
           <div className="response-options">
+            {responseOptions.question && (
+              <p className="response-question">{responseOptions.question}</p>
+            )}
             {responseOptions.options.map((option, i) => (
               <button
                 key={i}
